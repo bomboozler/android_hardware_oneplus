@@ -11,11 +11,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.res.Configuration
 import android.hardware.display.AmbientDisplayConfiguration
 import android.os.Handler
 import android.os.Looper
 import android.os.Message
-import android.os.UserHandle
+import android.os.UserHandle;
 import android.view.View
 import com.android.systemui.plugins.OverlayPlugin
 import com.android.systemui.plugins.annotations.Requires
@@ -25,8 +26,6 @@ class AlertSliderPlugin : OverlayPlugin {
     private lateinit var pluginContext: Context
     private lateinit var handler: NotificationHandler
     private lateinit var ambientConfig: AmbientDisplayConfiguration
-    private val dialogLock = Any()
-
     private data class NotificationInfo(
         val position: Int,
         val mode: Int,
@@ -101,14 +100,13 @@ class AlertSliderPlugin : OverlayPlugin {
                         removeMessages(MSG_DIALOG_DISMISS)
                         removeMessages(MSG_DIALOG_RESET)
 
-                        // Show/hide dialog
-                        if (value) {
-                            handleResetTimeout()
-                            handleDoze()
-                            dialog.show()
-                        } else {
-                            dialog.dismiss()
-                        }
+                    // Show/hide dialog
+                    if (value) {
+                        handleResetTimeout()
+                        handleDoze()
+                        dialog.show()
+                    } else {
+                        dialog.dismiss()
                     }
                     field = value
                 }
@@ -148,22 +146,26 @@ class AlertSliderPlugin : OverlayPlugin {
                 handleDoze()
                 dialog.setState(info.position, info.mode)
             }
+           handleDoze()
+            dialog.setState(info.position, info.mode)
         }
 
         private fun handleDoze() {
-            if (!ambientConfig.pulseOnNotificationEnabled(UserHandle.USER_CURRENT)) return
+            if (!ambientConfig.pulseOnNotificationEnabled(UserHandle.USER_CURRENT))
+                return
             val intent = Intent("com.android.systemui.doze.pulse")
             context.sendBroadcastAsUser(intent, UserHandle.CURRENT)
         }
 
-        private fun handleRecreate() {
-            // Remake if theme changed or rotation
-            val uiMode = context.resources.configuration.uiMode
-            val rotation = context.display.rotation
-            val themeChanged = uiMode != currUIMode
-            val rotationChanged = rotation != currRotation
-            if (themeChanged || rotationChanged) {
-                showing = false
+       private fun maybeRemake(): Boolean {
+            // Remake if theme changed
+            val uiMode = context.getResources().getConfiguration().uiMode
+            if (uiMode != currUIMode) {
+                currUIMode = uiMode
+                // Remove pending messages
+                removeMessages(MSG_DIALOG_SHOW)
+                removeMessages(MSG_DIALOG_DISMISS)
+                dialog.dismiss()
                 dialog = AlertSliderDialog(context)
                 currUIMode = uiMode
                 currRotation = rotation
@@ -179,7 +181,6 @@ class AlertSliderPlugin : OverlayPlugin {
         private const val MSG_DIALOG_DISMISS = 2
         private const val MSG_DIALOG_RESET = 3
         private const val MSG_DIALOG_UPDATE = 4
-        private const val MSG_DIALOG_RECREATE = 5
         private const val DIALOG_TIMEOUT = 3000L
 
         // Ringer mode
