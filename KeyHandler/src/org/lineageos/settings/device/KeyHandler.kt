@@ -85,7 +85,25 @@ class KeyHandler : Service() {
         alertSliderEventObserver.startObserving("tri_state_key")
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    override fun handleKeyEvent(event: KeyEvent): KeyEvent? {
+        if (event.action != KeyEvent.ACTION_DOWN) {
+            return event
+        }
+
+        val deviceName = event.device.name
+
+        if (deviceName != "oplus,hall_tri_state_key" && deviceName != "oplus,tri-state-key" && deviceName != "oplus_fp_input") {
+            return event
+        }
+
+        when (File("/proc/tristatekey/tri_state").readText().trim()) {
+            "1" -> handleMode(POSITION_TOP)
+            "2" -> handleMode(POSITION_MIDDLE)
+            "3" -> handleMode(POSITION_BOTTOM)
+        }
+
+        return null
+    }
 
     private fun vibrateIfNeeded(mode: Int) {
         when (mode) {
