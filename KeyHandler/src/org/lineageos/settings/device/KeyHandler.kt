@@ -24,11 +24,21 @@ import androidx.preference.PreferenceManager
 
 import java.util.concurrent.Executors
 
+<<<<<<< HEAD
 class KeyHandler : Service() {
     private lateinit var audioManager: AudioManager
     private lateinit var notificationManager: NotificationManager
     private lateinit var vibrator: Vibrator
     private lateinit var sharedPreferences: SharedPreferences
+=======
+class KeyHandler : DeviceKeyHandler {
+
+    private lateinit var audioManager: AudioManager
+    private lateinit var notificationManager: NotificationManager
+    private lateinit var vibrator: Vibrator
+    private lateinit var packageContext: Context
+    private lateinit var sharedPreferences: android.content.SharedPreferences
+>>>>>>> 440d851 (Keyhandler: Fix crash on first boot)
 
     private val executorService = Executors.newSingleThreadExecutor()
 
@@ -43,47 +53,28 @@ class KeyHandler : Service() {
         }
     }
 
-    private val alertSliderEventObserver = object : UEventObserver() {
-        private val lock = Any()
+    constructor(context: Context) : this() {
+        audioManager = context.getSystemService(AudioManager::class.java)!!
+        notificationManager = context.getSystemService(NotificationManager::class.java)!!
+        vibrator = context.getSystemService(Vibrator::class.java)!!
 
-        override fun onUEvent(event: UEvent) {
-            synchronized(lock) {
-                event.get("SWITCH_STATE")?.let {
-                    handleMode(it.toInt())
-                    return
-                }
-                event.get("STATE")?.let {
-                    val none = it.contains("USB=0")
-                    val vibration = it.contains("HOST=0")
-                    val silent = it.contains("null)=0")
+        packageContext = context.createPackageContext(
+            KeyHandler::class.java.getPackage()!!.name, 0
+        )
+        sharedPreferences = packageContext.getSharedPreferences(
+            packageContext.packageName + "_preferences",
+            Context.MODE_PRIVATE or Context.MODE_MULTI_PROCESS
+        )
 
-                    if (none && !vibration && !silent) {
-                        handleMode(POSITION_BOTTOM)
-                    } else if (!none && vibration && !silent) {
-                        handleMode(POSITION_MIDDLE)
-                    } else if (!none && !vibration && silent) {
-                        handleMode(POSITION_TOP)
-                    }
-
-                    return
-                }
-            }
-        }
-    }
-
-    override fun onCreate() {
-        audioManager = getSystemService(AudioManager::class.java)!!
-        notificationManager = getSystemService(NotificationManager::class.java)!!
-        vibrator = getSystemService(Vibrator::class.java)!!
-        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this)
-
-        registerReceiver(
+        context.registerReceiver(
             broadcastReceiver,
             IntentFilter(AudioManager.STREAM_MUTE_CHANGED_ACTION)
         )
         alertSliderEventObserver.startObserving("tri-state-key")
         alertSliderEventObserver.startObserving("tri_state_key")
     }
+
+    constructor()
 
     override fun handleKeyEvent(event: KeyEvent): KeyEvent? {
         if (event.action != KeyEvent.ACTION_DOWN) {
